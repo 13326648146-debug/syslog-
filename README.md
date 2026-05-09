@@ -95,14 +95,20 @@ data/        SQLite 与本地持久化目录
 - `examples/` 中提供 `rsyslog` 和 `filebeat` 示例
 - `collector` 默认使用宿主机网络模式，避免 Docker 网桥把设备真实源 IP 改写成容器网关地址
 
-## 初始化数据
+## 离线部署
 
-- API 启动时自动初始化管理员、演示资产、演示规则、基础设置
-- `seed-data` 服务在系统启动后自动写入演示日志
+### 在离线机器上导入并启动
 
-## 启动步骤
+1. 复制docker镜像以及文件包到离线机
 
-推荐先把数据目录放到大容量磁盘，例如你的 `/home` 盘：
+2. 导入镜像、解压文件包
+
+```bash
+for file in *.tar; do echo "正在加载: $file"; docker load -i "$file"; done
+tar -xzf syslog-offline-project.tar.gz
+```
+
+3. 启动
 
 ```bash
 mkdir -p /home/syslog-data/elasticsearch /home/syslog-data/redis /home/syslog-data/app
@@ -112,84 +118,10 @@ export ES_DATA_DIR=/home/syslog-data/elasticsearch
 export REDIS_DATA_DIR=/home/syslog-data/redis
 export APP_DATA_DIR=/home/syslog-data/app
 export HOST_STORAGE_ROOT=/home/syslog-data
-```
-
-1. 构建并启动服务
-
-```bash
-export INITIAL_ADMIN_PASSWORD='请自行设置强密码'
+export INITIAL_ADMIN_PASSWORD='自己设置的密码'
 export STREAM_BATCH_SIZE=1000
 export FILEBEAT_BATCH_SIZE=300
-docker-compose up -d --build
-```
 
-2. 查看服务状态
-
-```bash
-docker-compose ps
-```
-
-3. 查看日志
-
-```bash
-docker-compose logs -f backend
-docker-compose logs -f collector
-docker-compose logs -f processor
-```
-
-4. 如果初始化日志未自动注入，可手动执行
-
-```bash
-docker-compose run --rm seed-data
-```
-
-## 受限网络部署
-
-如果当前机器只能访问 Docker 镜像仓库，但容器构建阶段无法访问 PyPI / npm：
-
-```bash
-export INITIAL_ADMIN_PASSWORD='请自行设置强密码'
-export STREAM_BATCH_SIZE=1000
-export FILEBEAT_BATCH_SIZE=300
-docker compose build backend collector processor frontend
-docker compose up -d
-```
-
-这四个自定义镜像会直接使用仓库内的离线依赖与静态资源完成构建。
-
-## 完全离线部署
-
-### 在可联网机器上准备离线包
-
-```bash
-./scripts/prepare-offline-package.sh
-```
-
-该脚本会：
-
-- 重新生成 Python `vendor` 目录
-- 重新构建前端 `dist`
-- 构建自定义镜像
-- 拉取 Elasticsearch / Kibana / Redis 镜像
-- 导出 `offline/syslog-offline-images.tar`
-
-### 在离线机器上导入并启动
-
-1. 复制整个项目目录和 `offline/syslog-offline-images.tar` 到离线机器
-
-2. 导入镜像
-
-```bash
-docker load -i offline/syslog-offline-images.tar
-```
-
-3. 启动
-
-```bash
-export INITIAL_ADMIN_PASSWORD='请自行设置强密码'
-export HOST_STORAGE_ROOT=/home/syslog-data
-export STREAM_BATCH_SIZE=1000
-export FILEBEAT_BATCH_SIZE=300
 docker compose -f docker-compose.yml -f docker-compose.offline.yml up -d
 ```
 
